@@ -5,10 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Terminal Inventario Lamiere</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Libreria per la generazione del PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  
   <style>
     * { box-sizing: border-box; font-family: 'Courier New', Courier, monospace; margin: 0; padding: 0; }
     body { background-color: #05070a; color: #e2e8f0; padding: 15px; }
-    .container { max-width: 1250px; margin: 0 auto; }
+    .container { max-width: 1300px; margin: 0 auto; }
     
     /* Login Box Terminal Style */
     #login-screen { max-width: 400px; margin: 80px auto; background: #0f172a; padding: 25px; border: 1px solid #334155; border-radius: 6px; box-shadow: 0 0 15px rgba(0, 255, 65, 0.1); }
@@ -42,7 +45,7 @@
     .btn-info:hover { background: #166534; }
     
     /* Controls & Search */
-    .controls { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+    .controls { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; align-items: center; }
     .controls input, .controls select { padding: 10px; background: #0f172a; border: 1px solid #334155; color: #e2e8f0; border-radius: 4px; font-size: 13px; font-family: inherit; }
     .controls input:focus { outline: none; border-color: #38bdf8; }
     
@@ -72,6 +75,31 @@
     /* Input Variazione Personalizzata */
     .custom-qty-input { width: 75px; padding: 5px; text-align: center; background: #020617; border: 1px solid #334155; color: #38bdf8; font-weight: bold; border-radius: 4px; font-size: 12px; font-family: inherit; }
     .custom-qty-input:focus { outline: none; border-color: #38bdf8; }
+
+    /* Pulsante PDF Fluttuante (in basso a destra) */
+    .btn-pdf-float {
+      position: fixed;
+      bottom: 25px;
+      right: 25px;
+      width: 55px;
+      height: 55px;
+      border-radius: 50%;
+      background: #0284c7;
+      color: #ffffff;
+      border: 2px solid #38bdf8;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 24px;
+      z-index: 999;
+      transition: transform 0.2s, background 0.2s;
+    }
+    .btn-pdf-float:hover {
+      transform: scale(1.08);
+      background: #0369a1;
+    }
 
     /* Modals */
     .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; z-index: 1000; }
@@ -132,6 +160,7 @@
         <option value="Alluminio">Alluminio</option>
         <option value="Zincato">Zincato</option>
       </select>
+      <button id="btn-toggle-weights" class="btn btn-secondary" onclick="toggleWeights()">⚖️ Pesi</button>
     </div>
 
     <div class="table-responsive">
@@ -143,18 +172,22 @@
             <th>Formato</th>
             <th>Giacenza</th>
             <th>Variazione Rapida (+/-)</th>
+            <th class="weight-col" style="display: none;">Peso (Sing/Tot)</th>
             <th>Note</th>
             <th>Ultimo Agg.</th>
             <th class="action-col">Azioni</th>
           </tr>
         </thead>
         <tbody id="inventory-list">
-          <tr><td colspan="8" style="text-align: center; color: #64748b;">Connessione al database...</td></tr>
+          <tr><td colspan="9" style="text-align: center; color: #64748b;">Connessione al database...</td></tr>
         </tbody>
       </table>
     </div>
   </div>
 </div>
+
+<!-- PULSANTE PDF FLUTTUANTE (SOLO ICONA) -->
+<button class="btn-pdf-float" id="btn-pdf" onclick="generatePDF()" title="Esporta PDF" style="display: none;">📄</button>
 
 <!-- MODAL FORM AGGIUNGI / MODIFICA -->
 <div class="modal" id="item-modal">
@@ -229,6 +262,8 @@
   let currentUser = null;
   let isReadOnly = false;
   let rawData = [];
+  let currentFilteredData = [];
+  let showWeights = false;
 
   // Init Session
   window.onload = async () => {
@@ -237,7 +272,7 @@
       setupDashboard(session.user);
     }
     
-    // Gestione tasto Invio per autocompletamento materiale nella barra di ricerca
+    // Autocompletamento materiale con Invio
     document.getElementById('search-input').addEventListener('keydown', function(e) {
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -284,6 +319,7 @@
     
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('dashboard').style.display = 'block';
+    document.getElementById('btn-pdf').style.display = 'flex';
     
     document.getElementById('user-info').innerText = `${user.email} [${isReadOnly ? 'SOLA LETTURA' : 'OPERATORE'}]`;
 
@@ -295,7 +331,49 @@
     loadData();
   }
 
-  // Carica i dati dal database ordinando per Materiale e Spessore
+  // Calcolo Peso (kg) del singolo foglio e totale riga
+  function calculateWeight(materiale, spessore_mm, formato_str, quantita) {
+    if (!formato_str || !spessore_mm) return null;
+    const parts = formato_str.toLowerCase().split(/[x*×]/).map(s => parseFloat(s.trim()));
+    if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) return null;
+
+    const l = parts[0];
+    const w = parts[1];
+    
+    let density = 0.00000785; // Ferro / Zincato (7.85 kg/dm3 -> kg/mm3)
+    const matLower = (materiale || '').toLowerCase();
+    if (matLower.includes('inox')) density = 0.00000793;
+    else if (matLower.includes('alluminio')) density = 0.00000270;
+
+    const singleWeight = spessore_mm * l * w * density;
+    const totalWeight = singleWeight * quantita;
+
+    return {
+      single: singleWeight.toFixed(1),
+      total: totalWeight.toFixed(1)
+    };
+  }
+
+  // Interruttore Visibilità Pesi
+  function toggleWeights() {
+    showWeights = !showWeights;
+    const btn = document.getElementById('btn-toggle-weights');
+    if (showWeights) {
+      btn.style.borderColor = '#38bdf8';
+      btn.style.color = '#38bdf8';
+      btn.style.background = '#1e293b';
+    } else {
+      btn.style.borderColor = '#475569';
+      btn.style.color = '#cbd5e1';
+      btn.style.background = '#334155';
+    }
+    
+    document.querySelectorAll('.weight-col').forEach(el => {
+      el.style.display = showWeights ? 'table-cell' : 'none';
+    });
+  }
+
+  // Carica i dati dal database
   async function loadData() {
     const { data, error } = await db.from('inventario')
       .select('*')
@@ -304,16 +382,17 @@
       
     if (!error) {
       rawData = data;
-      renderTable(data);
+      filterTable();
     }
   }
 
   function renderTable(items) {
+    currentFilteredData = items;
     const tbody = document.getElementById('inventory-list');
     tbody.innerHTML = '';
 
     if (items.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #64748b;">Nessun materiale trovato.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: #64748b;">Nessun materiale trovato.</td></tr>';
       return;
     }
 
@@ -343,6 +422,12 @@
              <button class="btn btn-primary" style="padding: 5px 8px; font-size: 11px;" onclick="applyCustomDelta(${item.id})">OK</button>
            </div>`;
 
+      // Calcolo Pesi
+      const wInfo = calculateWeight(item.materiale, item.spessore_mm, item.formato, item.quantita);
+      const weightDisplay = wInfo 
+        ? `<span style="color: #f59e0b;">${wInfo.single} kg</span> / <strong style="color: #38bdf8;">${wInfo.total} kg</strong>`
+        : '-';
+
       let actionContent = isReadOnly ? '' : `
         <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="editItem(${item.id})">✏️</button>
         <button class="btn btn-danger" style="padding: 4px 8px; font-size: 11px;" onclick="deleteItem(${item.id}, '${item.materiale} ${item.spessore_mm}mm')">🗑️</button>
@@ -354,6 +439,7 @@
         <td>${item.formato}</td>
         <td>${qtyDisplay}</td>
         <td>${qtyControls}</td>
+        <td class="weight-col" style="display: ${showWeights ? 'table-cell' : 'none'}; font-size: 12px;">${weightDisplay}</td>
         <td style="color: #cbd5e1;">${item.note || '-'}</td>
         <td style="font-size: 11px; color: #64748b;">${dateStr}</td>
         ${isReadOnly ? '' : `<td>${actionContent}</td>`}
@@ -414,7 +500,6 @@
     const matFilter = document.getElementById('filter-material').value;
 
     const filtered = rawData.filter(item => {
-      // Escludiamo espressamente item.formato dalla ricerca testuale
       const matchSearch = search === '' || 
                           item.materiale.toLowerCase().includes(search) || 
                           item.spessore_mm.toString().includes(search) || 
@@ -425,6 +510,99 @@
     });
 
     renderTable(filtered);
+  }
+
+  // Generazione PDF dello stato attuale dell'inventario
+  function generatePDF() {
+    if (!currentFilteredData || currentFilteredData.length === 0) {
+      alert("Nessun materiale selezionato o presente da esportare nel PDF.");
+      return;
+    }
+
+    const matFilter = document.getElementById('filter-material').value;
+    const searchFilter = document.getElementById('search-input').value.trim();
+    let filterInfo = "TUTTI I MATERIALI";
+    if (matFilter) filterInfo = `MATERIALE: ${matFilter.toUpperCase()}`;
+    if (searchFilter) filterInfo += ` (Filtro: "${searchFilter}")`;
+
+    const nowStr = new Date().toLocaleString('it-IT');
+
+    // Creazione del contenitore grafico pulito per la stampa PDF
+    const pdfContainer = document.createElement('div');
+    pdfContainer.style.padding = '20px';
+    pdfContainer.style.fontFamily = 'Helvetica, Arial, sans-serif';
+    pdfContainer.style.color = '#1e293b';
+    pdfContainer.style.background = '#ffffff';
+
+    let tableRows = '';
+    let totKgAll = 0;
+    let totFogliAll = 0;
+
+    currentFilteredData.forEach(item => {
+      const w = calculateWeight(item.materiale, item.spessore_mm, item.formato, item.quantita);
+      const singleKg = w ? w.single + ' kg' : '-';
+      const totalKg = w ? w.total + ' kg' : '-';
+      if (w) totKgAll += parseFloat(w.total);
+      totFogliAll += item.quantita;
+
+      tableRows += `
+        <tr style="border-bottom: 1px solid #e2e8f0;">
+          <td style="padding: 8px; font-weight: bold;">${item.materiale}</td>
+          <td style="padding: 8px;">${item.spessore_mm} mm</td>
+          <td style="padding: 8px;">${item.formato}</td>
+          <td style="padding: 8px; font-weight: bold;">${item.quantita}</td>
+          <td style="padding: 8px;">${singleKg}</td>
+          <td style="padding: 8px; font-weight: bold; color: #0284c7;">${totalKg}</td>
+          <td style="padding: 8px; color: #64748b;">${item.note || '-'}</td>
+        </tr>
+      `;
+    });
+
+    pdfContainer.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0284c7; padding-bottom: 12px; margin-bottom: 15px;">
+        <div>
+          <h1 style="font-size: 20px; color: #0f172a; margin: 0;">BONINO 1913 | HDB</h1>
+          <h2 style="font-size: 13px; color: #0284c7; margin: 4px 0 0 0; text-transform: uppercase;">Report Giacenze Inventario Lamiere</h2>
+        </div>
+        <div style="text-align: right; font-size: 11px; color: #64748b;">
+          <div><strong>Data Stampa:</strong> ${nowStr}</div>
+          <div><strong>Selezione:</strong> ${filterInfo}</div>
+        </div>
+      </div>
+
+      <table style="width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 20px;">
+        <thead>
+          <tr style="background-color: #f1f5f9; color: #334155; text-align: left; font-size: 10px; text-transform: uppercase;">
+            <th style="padding: 8px;">Materiale</th>
+            <th style="padding: 8px;">Spessore</th>
+            <th style="padding: 8px;">Formato</th>
+            <th style="padding: 8px;">Giacenza</th>
+            <th style="padding: 8px;">Peso Foglio</th>
+            <th style="padding: 8px;">Peso Totale</th>
+            <th style="padding: 8px;">Note</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRows}
+        </tbody>
+      </table>
+
+      <div style="display: flex; justify-content: space-between; background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 15px; border-radius: 6px; font-size: 11px;">
+        <div><strong>Tipi di Lamiera:</strong> ${currentFilteredData.length}</div>
+        <div><strong>Totale Fogli in Giacenza:</strong> ${totFogliAll}</div>
+        <div><strong>Peso Complessivo Stimato:</strong> <span style="color: #0284c7; font-weight: bold;">${totKgAll.toFixed(1)} kg</span></div>
+      </div>
+    `;
+
+    const opt = {
+      margin:       10,
+      filename:     `Inventario_Lamiere_${new Date().toISOString().slice(0,10)}.pdf`,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2 },
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
+    };
+
+    html2pdf().set(opt).from(pdfContainer).save();
   }
 
   // Modal Gestione Schede
