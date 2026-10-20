@@ -1,0 +1,16 @@
+name: Keep Supabase Alive
+
+on:
+  schedule:
+    # Esegue l'operazione ogni lunedì e giovedì alle 08:00 UTC
+    - cron: '0 8 * * 1,4'
+  workflow_dispatch: # Permette di lanciarlo anche manualmente a schermo
+
+jobs:
+  ping-supabase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase Database
+        run: |
+          curl -s "https://gfftjszhdpucvfqdtmxf.supabase.co/rest/v1/inventario?select=id&limit=1" \
+            -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdmZnRqc3poZHB1Y3ZmcWR0bXhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1MjQwMDUsImV4cCI6MjEwODEwMDAwNX0.ujjN4qaqErL46znKe6cZ0k_zykDv-4hCqaZMlH52Lok"
