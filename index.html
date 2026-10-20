@@ -1,2 +1,349 @@
-const SUPABASE_URL = "https://gfftjszhdpucvfqdtmxf.supabase.co/rest/v1/";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdmZnRqc3poZHB1Y3ZmcWR0bXhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1MjQwMDUsImV4cCI6MjEwODEwMDAwNX0.ujjN4qaqErL46znKe6cZ0k_zykDv-4hCqaZMlH52Lok";
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestione Inventario Lamiere</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 0; }
+    body { background-color: #f4f6f9; color: #333; padding: 15px; }
+    .container { max-width: 1100px; margin: 0 auto; }
+    
+    /* Login Box */
+    #login-screen { max-width: 380px; margin: 80px auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    #login-screen h2 { margin-bottom: 15px; text-align: center; color: #1e293b; }
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; margin-bottom: 4px; font-size: 13px; font-weight: 600; }
+    .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px; }
+    
+    /* Dashboard */
+    header { display: flex; justify-content: space-between; align-items: center; background: #1e293b; color: #fff; padding: 15px 20px; border-radius: 8px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+    .user-badge { font-size: 13px; background: #334155; padding: 5px 10px; border-radius: 4px; }
+    .btn { padding: 8px 14px; border: none; border-radius: 5px; cursor: pointer; font-weight: 600; font-size: 13px; transition: 0.2s; }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-danger { background: #dc2626; color: #fff; }
+    .btn-secondary { background: #64748b; color: #fff; }
+    
+    /* Controls & Search */
+    .controls { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+    .controls input, .controls select { padding: 9px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 14px; }
+    
+    /* Table */
+    .table-responsive { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
+    th, td { padding: 12px 15px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+    th { background: #f8fafc; color: #475569; font-weight: 700; }
+    tr:hover { background: #f1f5f9; }
+    .zero-qty { background-color: #fef2f2 !important; font-weight: bold; }
+    .zero-qty td { color: #991b1b; }
+
+    /* Quantity Controls */
+    .qty-box { display: flex; align-items: center; gap: 8px; }
+    .btn-qty { width: 32px; height: 32px; border-radius: 4px; border: 1px solid #cbd5e1; background: #f8fafc; font-size: 16px; font-weight: bold; cursor: pointer; }
+    .btn-qty:hover { background: #e2e8f0; }
+
+    /* Modal */
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
+    .modal-content { background: #fff; padding: 20px; border-radius: 8px; width: 90%; max-width: 450px; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- LOGIN SCREEN -->
+  <div id="login-screen">
+    <h2>Accesso Inventario</h2>
+    <form id="login-form">
+      <div class="form-group">
+        <label>Email Utente</label>
+        <input type="email" id="login-email" required placeholder="laser@officina.local">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="login-password" required placeholder="••••••••">
+      </div>
+      <button type="submit" class="btn btn-primary" style="width: 100%;">Accedi</button>
+      <p id="login-error" style="color: red; font-size: 12px; margin-top: 10px; display: none;"></p>
+    </form>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="dashboard" style="display: none;">
+    <header>
+      <div>
+        <h2 style="font-size: 18px;">Magazzino Lamiere</h2>
+        <span class="user-badge" id="user-info">Caricamento...</span>
+      </div>
+      <div>
+        <button id="btn-add-modal" class="btn btn-primary" onclick="openModal()">+ Nuova Lamiera</button>
+        <button onclick="logout()" class="btn btn-secondary">Esci</button>
+      </div>
+    </header>
+
+    <div class="controls">
+      <input type="text" id="search-input" placeholder="Cerca materiale o nota..." oninput="filterTable()" style="flex-grow: 1;">
+      <select id="filter-material" onchange="filterTable()">
+        <option value="">Tutti i Materiali</option>
+        <option value="Ferro">Ferro</option>
+        <option value="Inox">Inox</option>
+        <option value="Alluminio">Alluminio</option>
+        <option value="Zincato">Zincato</option>
+      </select>
+    </div>
+
+    <div class="table-responsive">
+      <table>
+        <thead>
+          <tr>
+            <th>Materiale</th>
+            <th>Spessore</th>
+            <th>Formato</th>
+            <th>Giacenza</th>
+            <th>Note / Spezzoni</th>
+            <th>Ultima Modifica</th>
+            <th class="action-col">Azioni</th>
+          </tr>
+        </thead>
+        <tbody id="inventory-list">
+          <tr><td colspan="7" style="text-align: center;">Caricamento dati...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL FORM AGGIUNGI / MODIFICA -->
+<div class="modal" id="item-modal">
+  <div class="modal-content">
+    <h3 id="modal-title" style="margin-bottom: 15px;">Aggiungi Lamiera</h3>
+    <form id="item-form">
+      <input type="hidden" id="item-id">
+      <div class="form-group">
+        <label>Materiale</label>
+        <select id="item-materiale" required>
+          <option value="Ferro">Ferro</option>
+          <option value="Inox">Inox</option>
+          <option value="Alluminio">Alluminio</option>
+          <option value="Zincato">Zincato</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Spessore (mm)</label>
+        <input type="number" step="0.1" id="item-spessore" required placeholder="es. 1.5">
+      </div>
+      <div class="form-group">
+        <label>Formato (mm)</label>
+        <input type="text" id="item-formato" required placeholder="es. 3000x1500">
+      </div>
+      <div class="form-group">
+        <label>Quantità Fogli</label>
+        <input type="number" id="item-quantita" required min="0" value="0">
+      </div>
+      <div class="form-group">
+        <label>Note / Spezzoni (Opzionale)</label>
+        <input type="text" id="item-note" placeholder="es. Pellicolato, 1 spezzone 1000x500">
+      </div>
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 15px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Annulla</button>
+        <button type="submit" class="btn btn-primary">Salva</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  // 1. INSERISCI QUI I TUOI DATI SUPABASE
+  const SUPABASE_URL = "https://gfftjszhdpucvfqdtmxf.supabase.co/rest/v1/";
+  const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdmZnRqc3poZHB1Y3ZmcWR0bXhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1MjQwMDUsImV4cCI6MjEwODEwMDAwNX0.ujjN4qaqErL46znKe6cZ0k_zykDv-4hCqaZMlH52Lok";
+  const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  let currentUser = null;
+  let isReadOnly = false;
+  let rawData = [];
+
+  // Init Session
+  window.onload = async () => {
+    const { data: { session } } = await db.auth.getSession();
+    if (session) {
+      setupDashboard(session.user);
+    }
+  };
+
+  // Login Handler
+  document.getElementById('login-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
+    
+    const { data, error } = await db.auth.signInWithPassword({ email, password });
+    if (error) {
+      const errBox = document.getElementById('login-error');
+      errBox.innerText = "Errore accesso: Credenziali errate";
+      errBox.style.display = 'block';
+    } else {
+      setupDashboard(data.user);
+    }
+  };
+
+  async function logout() {
+    await db.auth.signOut();
+    location.reload();
+  }
+
+  function setupDashboard(user) {
+    currentUser = user;
+    isReadOnly = user.email.includes('acquisti'); // Riconosce la sola lettura dall'email 'acquisti'
+    
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    
+    document.getElementById('user-info').innerText = `${user.email} (${isReadOnly ? 'Sola Lettura' : 'Operatore'})`;
+
+    if (isReadOnly) {
+      document.getElementById('btn-add-modal').style.display = 'none';
+      document.querySelectorAll('.action-col').forEach(el => el.style.display = 'none');
+    }
+
+    loadData();
+  }
+
+  // Carica i dati dal database
+  async function loadData() {
+    const { data, error } = await db.from('inventario').select('*').order('materiale', { ascending: true });
+    if (!error) {
+      rawData = data;
+      renderTable(data);
+    }
+  }
+
+  function renderTable(items) {
+    const tbody = document.getElementById('inventory-list');
+    tbody.innerHTML = '';
+
+    if (items.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Nessun materiale trovato.</td></tr>';
+      return;
+    }
+
+    items.forEach(item => {
+      const tr = document.createElement('tr');
+      if (item.quantita === 0) tr.classList.add('zero-qty');
+
+      const dateStr = new Date(item.updated_at).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+      let qtyContent = isReadOnly 
+        ? `<strong>${item.quantita}</strong>` 
+        : `<div class="qty-box">
+             <button class="btn-qty" onclick="changeQty(${item.id}, ${item.quantita - 1})">-</button>
+             <strong>${item.quantita}</strong>
+             <button class="btn-qty" onclick="changeQty(${item.id}, ${item.quantita + 1})">+</button>
+           </div>`;
+
+      let actionContent = isReadOnly ? '' : `
+        <button class="btn btn-secondary" onclick="editItem(${item.id})">Modifica</button>
+      `;
+
+      tr.innerHTML = `
+        <td><strong>${item.materiale}</strong></td>
+        <td>${item.spessore_mm} mm</td>
+        <td>${item.formato}</td>
+        <td>${qtyContent}</td>
+        <td>${item.note || '-'}</td>
+        <td style="font-size: 12px; color: #64748b;">${dateStr}</td>
+        ${isReadOnly ? '' : `<td>${actionContent}</td>`}
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // Cambia quantità veloce
+  async function changeQty(id, newQty) {
+    if (newQty < 0) return;
+    const oldItem = rawData.find(i => i.id === id);
+    const diff = newQty - oldItem.quantita;
+
+    const { error } = await db.from('inventario')
+      .update({ quantita: newQty, updated_at: new Date() })
+      .eq('id', id);
+
+    if (!error) {
+      await db.from('storico_movimenti').insert({
+        lamiera_id: id,
+        tipo_operazione: diff > 0 ? 'CARICO' : 'SCARICO',
+        quantita_variata: diff,
+        quantita_risultante: newQty,
+        operatore: currentUser.email
+      });
+      loadData();
+    }
+  }
+
+  // Filtro materiali e testo
+  function filterTable() {
+    const search = document.getElementById('search-input').value.toLowerCase();
+    const matFilter = document.getElementById('filter-material').value;
+
+    const filtered = rawData.filter(item => {
+      const matchSearch = item.materiale.toLowerCase().includes(search) || (item.note && item.note.toLowerCase().includes(search));
+      const matchMat = matFilter === '' || item.materiale === matFilter;
+      return matchSearch && matchMat;
+    });
+
+    renderTable(filtered);
+  }
+
+  // Modal
+  function openModal() {
+    document.getElementById('item-id').value = '';
+    document.getElementById('item-form').reset();
+    document.getElementById('modal-title').innerText = "Aggiungi Lamiera";
+    document.getElementById('item-modal').style.display = 'flex';
+  }
+
+  function closeModal() {
+    document.getElementById('item-modal').style.display = 'none';
+  }
+
+  function editItem(id) {
+    const item = rawData.find(i => i.id === id);
+    if (!item) return;
+
+    document.getElementById('item-id').value = item.id;
+    document.getElementById('item-materiale').value = item.materiale;
+    document.getElementById('item-spessore').value = item.spessore_mm;
+    document.getElementById('item-formato').value = item.formato;
+    document.getElementById('item-quantita').value = item.quantita;
+    document.getElementById('item-note').value = item.note || '';
+
+    document.getElementById('modal-title').innerText = "Modifica Scheda Lamiera";
+    document.getElementById('item-modal').style.display = 'flex';
+  }
+
+  // Salva Form
+  document.getElementById('item-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('item-id').value;
+    const payload = {
+      materiale: document.getElementById('item-materiale').value,
+      spessore_mm: parseFloat(document.getElementById('item-spessore').value),
+      formato: document.getElementById('item-formato').value,
+      quantita: parseInt(document.getElementById('item-quantita').value),
+      note: document.getElementById('item-note').value,
+      updated_at: new Date()
+    };
+
+    if (id) {
+      await db.from('inventario').update(payload).eq('id', id);
+    } else {
+      await db.from('inventario').insert(payload);
+    }
+
+    closeModal();
+    loadData();
+  };
+</script>
+</body>
+</html>
+
+
