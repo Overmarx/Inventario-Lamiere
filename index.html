@@ -3,49 +3,72 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gestione Inventario Lamiere</title>
+  <title>Terminal Inventario Lamiere</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 0; }
-    body { background-color: #f4f6f9; color: #333; padding: 15px; }
-    .container { max-width: 1100px; margin: 0 auto; }
+    * { box-sizing: border-box; font-family: 'Courier New', Courier, monospace, monospace; margin: 0; padding: 0; }
+    body { background-color: #05070a; color: #e2e8f0; padding: 15px; }
+    .container { max-width: 1200px; margin: 0 auto; }
     
-    /* Login Box */
-    #login-screen { max-width: 380px; margin: 80px auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-    #login-screen h2 { margin-bottom: 15px; text-align: center; color: #1e293b; }
-    .form-group { margin-bottom: 12px; }
-    .form-group label { display: block; margin-bottom: 4px; font-size: 13px; font-weight: 600; }
-    .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px; }
+    /* Login Box Terminal Style */
+    #login-screen { max-width: 400px; margin: 80px auto; background: #0f172a; padding: 25px; border: 1px solid #334155; border-radius: 6px; box-shadow: 0 0 15px rgba(0, 255, 65, 0.1); }
+    #login-screen h2 { margin-bottom: 15px; text-align: center; color: #38bdf8; font-size: 18px; text-transform: uppercase; letter-spacing: 1px; }
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; margin-bottom: 4px; font-size: 12px; color: #94a3b8; text-transform: uppercase; }
+    .form-group input, .form-group select { width: 100%; padding: 10px; background: #020617; border: 1px solid #334155; color: #f8fafc; border-radius: 4px; font-size: 14px; font-family: inherit; }
+    .form-group input:focus, .form-group select:focus { outline: none; border-color: #38bdf8; }
+
+    /* Dashboard Header */
+    header { display: flex; justify-content: space-between; align-items: center; background: #0f172a; border: 1px solid #1e293b; color: #fff; padding: 15px 20px; border-radius: 6px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+    .user-badge { font-size: 12px; background: #1e293b; color: #38bdf8; padding: 4px 8px; border-radius: 4px; border: 1px solid #334155; }
     
-    /* Dashboard */
-    header { display: flex; justify-content: space-between; align-items: center; background: #1e293b; color: #fff; padding: 15px 20px; border-radius: 8px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
-    .user-badge { font-size: 13px; background: #334155; padding: 5px 10px; border-radius: 4px; }
-    .btn { padding: 8px 14px; border: none; border-radius: 5px; cursor: pointer; font-weight: 600; font-size: 13px; transition: 0.2s; }
-    .btn-primary { background: #2563eb; color: #fff; }
-    .btn-danger { background: #dc2626; color: #fff; }
-    .btn-secondary { background: #64748b; color: #fff; }
+    /* Buttons */
+    .btn { padding: 8px 12px; border: 1px solid transparent; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px; font-family: inherit; text-transform: uppercase; transition: 0.15s; }
+    .btn-primary { background: #0284c7; color: #fff; border-color: #38bdf8; }
+    .btn-primary:hover { background: #0369a1; }
+    .btn-danger { background: #991b1b; color: #fca5a5; border-color: #ef4444; }
+    .btn-danger:hover { background: #7f1d1d; }
+    .btn-secondary { background: #334155; color: #cbd5e1; border-color: #475569; }
+    .btn-secondary:hover { background: #1e293b; }
+    .btn-info { background: #15803d; color: #86efac; border-color: #22c55e; }
+    .btn-info:hover { background: #166534; }
     
     /* Controls & Search */
     .controls { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
-    .controls input, .controls select { padding: 9px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 14px; }
+    .controls input, .controls select { padding: 10px; background: #0f172a; border: 1px solid #334155; color: #e2e8f0; border-radius: 4px; font-size: 13px; font-family: inherit; }
+    .controls input:focus { outline: none; border-color: #38bdf8; }
     
     /* Table */
-    .table-responsive { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
-    th, td { padding: 12px 15px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
-    th { background: #f8fafc; color: #475569; font-weight: 700; }
-    tr:hover { background: #f1f5f9; }
-    .zero-qty { background-color: #fef2f2 !important; font-weight: bold; }
-    .zero-qty td { color: #991b1b; }
+    .table-responsive { background: #090d16; border: 1px solid #1e293b; border-radius: 6px; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+    th, td { padding: 12px 14px; border-bottom: 1px solid #1e293b; vertical-align: middle; }
+    th { background: #0f172a; color: #64748b; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }
+    tr:hover { background: #0f172a; }
+    
+    /* Colorazione per Materiale */
+    .mat-badge { display: inline-block; padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; }
+    .mat-ferro { color: #f87171; background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; }
+    .mat-inox { color: #60a5fa; background: rgba(59, 130, 246, 0.15); border: 1px solid #3b82f6; }
+    .mat-alluminio { color: #4ade80; background: rgba(34, 197, 94, 0.15); border: 1px solid #22c55e; }
+    .mat-zincato { color: #9ca3af; background: rgba(156, 163, 175, 0.15); border: 1px solid #9ca3af; }
+
+    /* Indicatori Giacenza Zero / Bassa */
+    .zero-qty { background-color: rgba(153, 27, 27, 0.2) !important; }
+    .zero-qty-badge { color: #fca5a5; font-weight: bold; }
 
     /* Quantity Controls */
-    .qty-box { display: flex; align-items: center; gap: 8px; }
-    .btn-qty { width: 32px; height: 32px; border-radius: 4px; border: 1px solid #cbd5e1; background: #f8fafc; font-size: 16px; font-weight: bold; cursor: pointer; }
-    .btn-qty:hover { background: #e2e8f0; }
+    .qty-box { display: flex; align-items: center; gap: 5px; flex-wrap: nowrap; }
+    .btn-qty { width: 30px; height: 30px; border-radius: 4px; border: 1px solid #334155; background: #1e293b; color: #f8fafc; font-size: 13px; font-weight: bold; cursor: pointer; font-family: inherit; }
+    .btn-qty:hover { background: #334155; border-color: #38bdf8; }
+    
+    /* Input variazione personalizzata */
+    .custom-qty-input { width: 60px; padding: 5px; text-align: center; background: #020617; border: 1px solid #334155; color: #38bdf8; font-weight: bold; border-radius: 4px; font-size: 12px; font-family: inherit; }
+    .custom-qty-input:focus { outline: none; border-color: #38bdf8; }
 
-    /* Modal */
-    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
-    .modal-content { background: #fff; padding: 20px; border-radius: 8px; width: 90%; max-width: 450px; }
+    /* Modals */
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; z-index: 1000; }
+    .modal-content { background: #0f172a; border: 1px solid #334155; padding: 20px; border-radius: 6px; width: 90%; max-width: 600px; max-height: 85vh; overflow-y: auto; color: #f8fafc; }
+    .modal-content h3 { color: #38bdf8; font-size: 16px; margin-bottom: 15px; }
   </style>
 </head>
 <body>
@@ -53,7 +76,7 @@
 <div class="container">
   <!-- LOGIN SCREEN -->
   <div id="login-screen">
-    <h2>Accesso Inventario</h2>
+    <h2>[ ACCESS_CONTROL ]</h2>
     <form id="login-form">
       <div class="form-group">
         <label>Email Utente</label>
@@ -63,8 +86,8 @@
         <label>Password</label>
         <input type="password" id="login-password" required placeholder="••••••••">
       </div>
-      <button type="submit" class="btn btn-primary" style="width: 100%;">Accedi</button>
-      <p id="login-error" style="color: red; font-size: 12px; margin-top: 10px; display: none;"></p>
+      <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 5px;">ACCEDI AL TERMINALE</button>
+      <p id="login-error" style="color: #f87171; font-size: 12px; margin-top: 10px; display: none; text-align: center;"></p>
     </form>
   </div>
 
@@ -72,17 +95,18 @@
   <div id="dashboard" style="display: none;">
     <header>
       <div>
-        <h2 style="font-size: 18px;">Magazzino Lamiere</h2>
+        <h2 style="font-size: 16px; color: #38bdf8; letter-spacing: 1px;">MAGAZZINO LAMIERE</h2>
         <span class="user-badge" id="user-info">Caricamento...</span>
       </div>
-      <div>
+      <div style="display: flex; gap: 8px;">
         <button id="btn-add-modal" class="btn btn-primary" onclick="openModal()">+ Nuova Lamiera</button>
+        <button class="btn btn-info" onclick="openHistoryModal()">📜 Storico</button>
         <button onclick="logout()" class="btn btn-secondary">Esci</button>
       </div>
     </header>
 
     <div class="controls">
-      <input type="text" id="search-input" placeholder="Cerca materiale o nota..." oninput="filterTable()" style="flex-grow: 1;">
+      <input type="text" id="search-input" placeholder="Cerca materiale, spessore, note..." oninput="filterTable()" style="flex-grow: 1;">
       <select id="filter-material" onchange="filterTable()">
         <option value="">Tutti i Materiali</option>
         <option value="Ferro">Ferro</option>
@@ -100,13 +124,14 @@
             <th>Spessore</th>
             <th>Formato</th>
             <th>Giacenza</th>
+            <th>Variazione Rapida (+/-)</th>
             <th>Note / Spezzoni</th>
-            <th>Ultima Modifica</th>
+            <th>Ultimo Agg.</th>
             <th class="action-col">Azioni</th>
           </tr>
         </thead>
         <tbody id="inventory-list">
-          <tr><td colspan="7" style="text-align: center;">Caricamento dati...</td></tr>
+          <tr><td colspan="8" style="text-align: center; color: #64748b;">Connessione al database...</td></tr>
         </tbody>
       </table>
     </div>
@@ -116,7 +141,7 @@
 <!-- MODAL FORM AGGIUNGI / MODIFICA -->
 <div class="modal" id="item-modal">
   <div class="modal-content">
-    <h3 id="modal-title" style="margin-bottom: 15px;">Aggiungi Lamiera</h3>
+    <h3 id="modal-title">Aggiungi Lamiera</h3>
     <form id="item-form">
       <input type="hidden" id="item-id">
       <div class="form-group">
@@ -144,11 +169,37 @@
         <label>Note / Spezzoni (Opzionale)</label>
         <input type="text" id="item-note" placeholder="es. Pellicolato, 1 spezzone 1000x500">
       </div>
-      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 15px;">
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
         <button type="button" class="btn btn-secondary" onclick="closeModal()">Annulla</button>
-        <button type="submit" class="btn btn-primary">Salva</button>
+        <button type="submit" class="btn btn-primary">Salva Scheda</button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- MODAL STORICO MOVIMENTI -->
+<div class="modal" id="history-modal">
+  <div class="modal-content">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+      <h3>📜 Storico Movimenti (Ultimi 50)</h3>
+      <button class="btn btn-secondary" onclick="closeHistoryModal()">Chiudi</button>
+    </div>
+    <div class="table-responsive">
+      <table>
+        <thead>
+          <tr>
+            <th>Data/Ora</th>
+            <th>Tipo</th>
+            <th>Variazione</th>
+            <th>Saldo</th>
+            <th>Operatore</th>
+          </tr>
+        </thead>
+        <tbody id="history-list">
+          <tr><td colspan="5" style="text-align: center; color: #64748b;">Caricamento storico...</td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -178,7 +229,7 @@
     const { data, error } = await db.auth.signInWithPassword({ email, password });
     if (error) {
       const errBox = document.getElementById('login-error');
-      errBox.innerText = "Errore accesso: Credenziali errate";
+      errBox.innerText = "ACCESSO NEGATO: Credenziali errate";
       errBox.style.display = 'block';
     } else {
       setupDashboard(data.user);
@@ -192,15 +243,13 @@
 
   function setupDashboard(user) {
     currentUser = user;
-    
-    // Controllo del ruolo nei Metadata (Default = 'viewer')
     const userRole = user.user_metadata?.role || 'viewer';
     isReadOnly = (userRole === 'viewer');
     
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('dashboard').style.display = 'block';
     
-    document.getElementById('user-info').innerText = `${user.email} (${isReadOnly ? 'Sola Lettura' : 'Operatore'})`;
+    document.getElementById('user-info').innerText = `${user.email} [${isReadOnly ? 'SOLA LETTURA' : 'OPERATORE'}]`;
 
     if (isReadOnly) {
       document.getElementById('btn-add-modal').style.display = 'none';
@@ -224,7 +273,7 @@
     tbody.innerHTML = '';
 
     if (items.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Nessun materiale trovato.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #64748b;">Nessun materiale in archivio.</td></tr>';
       return;
     }
 
@@ -234,36 +283,55 @@
 
       const dateStr = new Date(item.updated_at).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-      let qtyContent = isReadOnly 
-        ? `<strong>${item.quantita}</strong>` 
+      // Badge colore per Materiale
+      const matLower = item.materiale.toLowerCase();
+      let matClass = 'mat-ferro';
+      if (matLower.includes('inox')) matClass = 'mat-inox';
+      else if (matLower.includes('alluminio')) matClass = 'mat-alluminio';
+      else if (matLower.includes('zincato')) matClass = 'mat-zincato';
+
+      let qtyDisplay = item.quantita === 0 
+        ? `<span class="zero-qty-badge">0 (ESAURITO)</span>` 
+        : `<strong style="font-size: 15px; color: #f8fafc;">${item.quantita}</strong>`;
+
+      let qtyControls = isReadOnly 
+        ? `<span style="color: #64748b;">-</span>` 
         : `<div class="qty-box">
-             <button class="btn-qty" onclick="changeQty(${item.id}, ${item.quantita - 1})">-</button>
-             <strong>${item.quantita}</strong>
-             <button class="btn-qty" onclick="changeQty(${item.id}, ${item.quantita + 1})">+</button>
+             <button class="btn-qty" title="-1 foglio" onclick="changeQtyByDelta(${item.id}, -1)">-1</button>
+             <button class="btn-qty" title="+1 foglio" onclick="changeQtyByDelta(${item.id}, 1)">+1</button>
+             <input type="number" id="custom-delta-${item.id}" class="custom-qty-input" placeholder="± custom" onkeydown="if(event.key==='Enter') applyCustomDelta(${item.id})">
+             <button class="btn btn-primary" style="padding: 5px 8px; font-size: 11px;" onclick="applyCustomDelta(${item.id})">OK</button>
            </div>`;
 
       let actionContent = isReadOnly ? '' : `
-        <button class="btn btn-secondary" onclick="editItem(${item.id})">Modifica</button>
+        <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="editItem(${item.id})">✏️</button>
+        <button class="btn btn-danger" style="padding: 4px 8px; font-size: 11px;" onclick="deleteItem(${item.id}, '${item.materiale} ${item.spessore_mm}mm')">🗑️</button>
       `;
 
       tr.innerHTML = `
-        <td><strong>${item.materiale}</strong></td>
-        <td>${item.spessore_mm} mm</td>
+        <td><span class="mat-badge ${matClass}">${item.materiale}</span></td>
+        <td><strong style="color: #38bdf8;">${item.spessore_mm}</strong> mm</td>
         <td>${item.formato}</td>
-        <td>${qtyContent}</td>
-        <td>${item.note || '-'}</td>
-        <td style="font-size: 12px; color: #64748b;">${dateStr}</td>
+        <td>${qtyDisplay}</td>
+        <td>${qtyControls}</td>
+        <td style="color: #cbd5e1;">${item.note || '-'}</td>
+        <td style="font-size: 11px; color: #64748b;">${dateStr}</td>
         ${isReadOnly ? '' : `<td>${actionContent}</td>`}
       `;
       tbody.appendChild(tr);
     });
   }
 
-  // Cambia quantità veloce
-  async function changeQty(id, newQty) {
-    if (newQty < 0) return;
-    const oldItem = rawData.find(i => i.id === id);
-    const diff = newQty - oldItem.quantita;
+  // Variazione Quantità singola (+1 / -1)
+  async function changeQtyByDelta(id, delta) {
+    if (isNaN(delta) || delta === 0) return;
+    const item = rawData.find(i => i.id === id);
+    if (!item) return;
+
+    let newQty = item.quantita + delta;
+    if (newQty < 0) newQty = 0;
+    const actualDiff = newQty - item.quantita;
+    if (actualDiff === 0) return;
 
     const { error } = await db.from('inventario')
       .update({ quantita: newQty, updated_at: new Date() })
@@ -272,12 +340,31 @@
     if (!error) {
       await db.from('storico_movimenti').insert({
         lamiera_id: id,
-        tipo_operazione: diff > 0 ? 'CARICO' : 'SCARICO',
-        quantita_variata: diff,
+        tipo_operazione: actualDiff > 0 ? 'CARICO' : 'SCARICO',
+        quantita_variata: actualDiff,
         quantita_risultante: newQty,
         operatore: currentUser.email
       });
       loadData();
+    }
+  }
+
+  // Applica variazione numerica personalizzata (es. +10 o -5)
+  function applyCustomDelta(id) {
+    const inputEl = document.getElementById(`custom-delta-${id}`);
+    if (!inputEl) return;
+    const val = parseInt(inputEl.value);
+    if (!isNaN(val) && val !== 0) {
+      changeQtyByDelta(id, val);
+      inputEl.value = '';
+    }
+  }
+
+  // Eliminazione Scheda
+  async function deleteItem(id, nomeLamiera) {
+    if (confirm(`Confermi l'eliminazione definitiva di: ${nomeLamiera}?`)) {
+      const { error } = await db.from('inventario').delete().eq('id', id);
+      if (!error) loadData();
     }
   }
 
@@ -287,7 +374,10 @@
     const matFilter = document.getElementById('filter-material').value;
 
     const filtered = rawData.filter(item => {
-      const matchSearch = item.materiale.toLowerCase().includes(search) || (item.note && item.note.toLowerCase().includes(search));
+      const matchSearch = item.materiale.toLowerCase().includes(search) || 
+                          item.spessore_mm.toString().includes(search) || 
+                          item.formato.toLowerCase().includes(search) || 
+                          (item.note && item.note.toLowerCase().includes(search));
       const matchMat = matFilter === '' || item.materiale === matFilter;
       return matchSearch && matchMat;
     });
@@ -295,7 +385,7 @@
     renderTable(filtered);
   }
 
-  // Modal
+  // Modal Gestione Schede
   function openModal() {
     document.getElementById('item-id').value = '';
     document.getElementById('item-form').reset();
@@ -344,6 +434,44 @@
     closeModal();
     loadData();
   };
+
+  // Storico Movimenti Modal
+  async function openHistoryModal() {
+    document.getElementById('history-modal').style.display = 'flex';
+    const tbody = document.getElementById('history-list');
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #64748b;">Lettura storico...</td></tr>';
+
+    const { data, error } = await db.from('storico_movimenti')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (error || !data || data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #64748b;">Nessun movimento trovato.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = '';
+    data.forEach(m => {
+      const dateStr = new Date(m.created_at).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      const tr = document.createElement('tr');
+      const isCarico = m.tipo_operazione === 'CARICO';
+      const badgeColor = isCarico ? 'color: #4ade80;' : 'color: #f87171;';
+      
+      tr.innerHTML = `
+        <td style="font-size: 11px; color: #94a3b8;">${dateStr}</td>
+        <td style="${badgeColor} font-weight: bold;">${m.tipo_operazione}</td>
+        <td><strong style="${badgeColor}">${m.quantita_variata > 0 ? '+' + m.quantita_variata : m.quantita_variata}</strong></td>
+        <td><strong>${m.quantita_risultante}</strong></td>
+        <td style="font-size: 11px; color: #64748b;">${m.operatore || '-'}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function closeHistoryModal() {
+    document.getElementById('history-modal').style.display = 'none';
+  }
 </script>
 </body>
 </html>
