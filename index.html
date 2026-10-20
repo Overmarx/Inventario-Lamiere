@@ -153,9 +153,9 @@
 </div>
 
 <script>
-  // 1. INSERISCI QUI I TUOI DATI SUPABASE
-  const SUPABASE_URL = "https://gfftjszhdpucvfqdtmxf.supabase.co/rest/v1/";
-  const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdmZnRqc3poZHB1Y3ZmcWR0bXhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1MjQwMDUsImV4cCI6MjEwODEwMDAwNX0.ujjN4qaqErL46znKe6cZ0k_zykDv-4hCqaZMlH52Lok";
+  // INSERISCI QUI I TUOI DATI SUPABASE
+  const SUPABASE_URL = "https://gfftjszhdpucvfqdtmxf.supabase.co/rest/v1/"; // Inserisci il tuo URL completo
+  const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdmZnRqc3poZHB1Y3ZmcWR0bXhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1MjQwMDUsImV4cCI6MjEwODEwMDAwNX0.ujjN4qaqErL46znKe6cZ0k_zykDv-4hCqaZMlH52Lok"; // Inserisci la tua chiave anon
   const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   let currentUser = null;
@@ -345,5 +345,3 @@
 </script>
 </body>
 </html>
-
-
