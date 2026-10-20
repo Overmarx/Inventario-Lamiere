@@ -57,7 +57,7 @@
     <form id="login-form">
       <div class="form-group">
         <label>Email Utente</label>
-        <input type="email" id="login-email" required placeholder="laser@officina.local">
+        <input type="email" id="login-email" required placeholder="utente@officina.local">
       </div>
       <div class="form-group">
         <label>Password</label>
@@ -153,9 +153,8 @@
 </div>
 
 <script>
-  // INSERISCI QUI I TUOI DATI SUPABASE
-  const SUPABASE_URL = "https://gfftjszhdpucvfqdtmxf.supabase.co"; // Inserisci il tuo URL completo
-  const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdmZnRqc3poZHB1Y3ZmcWR0bXhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1MjQwMDUsImV4cCI6MjEwODEwMDAwNX0.ujjN4qaqErL46znKe6cZ0k_zykDv-4hCqaZMlH52Lok"; // Inserisci la tua chiave anon
+  const SUPABASE_URL = "https://gfftjszhdpucvfqdtmxf.supabase.co";
+  const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdmZnRqc3poZHB1Y3ZmcWR0bXhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1MjQwMDUsImV4cCI6MjEwODEwMDAwNX0.ujjN4qaqErL46znKe6cZ0k_zykDv-4hCqaZMlH52Lok";
   const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   let currentUser = null;
@@ -193,7 +192,10 @@
 
   function setupDashboard(user) {
     currentUser = user;
-    isReadOnly = user.email.includes('acquisti'); // Riconosce la sola lettura dall'email 'acquisti'
+    
+    // Controllo del ruolo nei Metadata (Default = 'viewer')
+    const userRole = user.user_metadata?.role || 'viewer';
+    isReadOnly = (userRole === 'viewer');
     
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('dashboard').style.display = 'block';
