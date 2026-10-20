@@ -6,9 +6,9 @@
   <title>Terminal Inventario Lamiere</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    * { box-sizing: border-box; font-family: 'Courier New', Courier, monospace, monospace; margin: 0; padding: 0; }
+    * { box-sizing: border-box; font-family: 'Courier New', Courier, monospace; margin: 0; padding: 0; }
     body { background-color: #05070a; color: #e2e8f0; padding: 15px; }
-    .container { max-width: 1200px; margin: 0 auto; }
+    .container { max-width: 1250px; margin: 0 auto; }
     
     /* Login Box Terminal Style */
     #login-screen { max-width: 400px; margin: 80px auto; background: #0f172a; padding: 25px; border: 1px solid #334155; border-radius: 6px; box-shadow: 0 0 15px rgba(0, 255, 65, 0.1); }
@@ -19,8 +19,16 @@
     .form-group input:focus, .form-group select:focus { outline: none; border-color: #38bdf8; }
 
     /* Dashboard Header */
-    header { display: flex; justify-content: space-between; align-items: center; background: #0f172a; border: 1px solid #1e293b; color: #fff; padding: 15px 20px; border-radius: 6px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
-    .user-badge { font-size: 12px; background: #1e293b; color: #38bdf8; padding: 4px 8px; border-radius: 4px; border: 1px solid #334155; }
+    header { display: flex; justify-content: space-between; align-items: center; background: #0f172a; border: 1px solid #1e293b; color: #fff; padding: 15px 20px; border-radius: 6px; margin-bottom: 20px; flex-wrap: wrap; gap: 15px; }
+    
+    .header-left { display: flex; flex-direction: column; align-items: flex-start; }
+    .header-center { flex: 1; display: flex; justify-content: center; align-items: center; min-width: 200px; }
+    .header-right { display: flex; gap: 8px; align-items: center; }
+
+    /* Logo Style in Negativo */
+    .company-logo { max-height: 48px; max-width: 300px; object-fit: contain; filter: brightness(1.2) contrast(1.1); }
+
+    .user-badge { font-size: 12px; background: #1e293b; color: #38bdf8; padding: 4px 8px; border-radius: 4px; border: 1px solid #334155; display: inline-block; }
     
     /* Buttons */
     .btn { padding: 8px 12px; border: 1px solid transparent; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px; font-family: inherit; text-transform: uppercase; transition: 0.15s; }
@@ -45,14 +53,14 @@
     th { background: #0f172a; color: #64748b; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }
     tr:hover { background: #0f172a; }
     
-    /* Colorazione per Materiale */
+    /* Colorazione Materiali */
     .mat-badge { display: inline-block; padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; }
     .mat-ferro { color: #f87171; background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; }
     .mat-inox { color: #60a5fa; background: rgba(59, 130, 246, 0.15); border: 1px solid #3b82f6; }
     .mat-alluminio { color: #4ade80; background: rgba(34, 197, 94, 0.15); border: 1px solid #22c55e; }
     .mat-zincato { color: #9ca3af; background: rgba(156, 163, 175, 0.15); border: 1px solid #9ca3af; }
 
-    /* Indicatori Giacenza Zero / Bassa */
+    /* Indicatori Giacenza Zero */
     .zero-qty { background-color: rgba(153, 27, 27, 0.2) !important; }
     .zero-qty-badge { color: #fca5a5; font-weight: bold; }
 
@@ -61,8 +69,8 @@
     .btn-qty { width: 30px; height: 30px; border-radius: 4px; border: 1px solid #334155; background: #1e293b; color: #f8fafc; font-size: 13px; font-weight: bold; cursor: pointer; font-family: inherit; }
     .btn-qty:hover { background: #334155; border-color: #38bdf8; }
     
-    /* Input variazione personalizzata */
-    .custom-qty-input { width: 60px; padding: 5px; text-align: center; background: #020617; border: 1px solid #334155; color: #38bdf8; font-weight: bold; border-radius: 4px; font-size: 12px; font-family: inherit; }
+    /* Input Variazione Personalizzata */
+    .custom-qty-input { width: 75px; padding: 5px; text-align: center; background: #020617; border: 1px solid #334155; color: #38bdf8; font-weight: bold; border-radius: 4px; font-size: 12px; font-family: inherit; }
     .custom-qty-input:focus { outline: none; border-color: #38bdf8; }
 
     /* Modals */
@@ -94,11 +102,21 @@
   <!-- DASHBOARD -->
   <div id="dashboard" style="display: none;">
     <header>
-      <div>
+      <div class="header-left">
         <h2 style="font-size: 16px; color: #38bdf8; letter-spacing: 1px;">MAGAZZINO LAMIERE</h2>
-        <span class="user-badge" id="user-info">Caricamento...</span>
+        <div style="margin-top: 10px;">
+          <span class="user-badge" id="user-info">Caricamento...</span>
+        </div>
       </div>
-      <div style="display: flex; gap: 8px;">
+
+      <div class="header-center">
+        <img src="logo.png" alt="Logo Aziendale" class="company-logo" onerror="this.style.display='none'; document.getElementById('logo-fallback').style.display='block';">
+        <div id="logo-fallback" style="display: none; color: #f8fafc; font-weight: bold; font-size: 14px; letter-spacing: 2px;">
+          BONINO 1913 | HDB
+        </div>
+      </div>
+
+      <div class="header-right">
         <button id="btn-add-modal" class="btn btn-primary" onclick="openModal()">+ Nuova Lamiera</button>
         <button class="btn btn-info" onclick="openHistoryModal()">📜 Storico</button>
         <button onclick="logout()" class="btn btn-secondary">Esci</button>
@@ -106,7 +124,7 @@
     </header>
 
     <div class="controls">
-      <input type="text" id="search-input" placeholder="Cerca materiale, spessore, note..." oninput="filterTable()" style="flex-grow: 1;">
+      <input type="text" id="search-input" placeholder="Cerca materiale (es. 'fe' + Invio), spessore o note..." oninput="filterTable()" style="flex-grow: 1;">
       <select id="filter-material" onchange="filterTable()">
         <option value="">Tutti i Materiali</option>
         <option value="Ferro">Ferro</option>
@@ -125,7 +143,7 @@
             <th>Formato</th>
             <th>Giacenza</th>
             <th>Variazione Rapida (+/-)</th>
-            <th>Note / Spezzoni</th>
+            <th>Note</th>
             <th>Ultimo Agg.</th>
             <th class="action-col">Azioni</th>
           </tr>
@@ -166,8 +184,8 @@
         <input type="number" id="item-quantita" required min="0" value="0">
       </div>
       <div class="form-group">
-        <label>Note / Spezzoni (Opzionale)</label>
-        <input type="text" id="item-note" placeholder="es. Pellicolato, 1 spezzone 1000x500">
+        <label>Note (Opzionale)</label>
+        <input type="text" id="item-note" placeholder="es. Pellicolato, Fiorettato">
       </div>
       <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
         <button type="button" class="btn btn-secondary" onclick="closeModal()">Annulla</button>
@@ -218,6 +236,24 @@
     if (session) {
       setupDashboard(session.user);
     }
+    
+    // Gestione tasto Invio per autocompletamento materiale nella barra di ricerca
+    document.getElementById('search-input').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const val = this.value.trim().toLowerCase();
+        if (!val) return;
+
+        const materials = ['Ferro', 'Inox', 'Alluminio', 'Zincato'];
+        const matched = materials.find(m => m.toLowerCase().startsWith(val) || val.startsWith(m.toLowerCase().slice(0, 2)));
+        
+        if (matched) {
+          document.getElementById('filter-material').value = matched;
+          this.value = '';
+          filterTable();
+        }
+      }
+    });
   };
 
   // Login Handler
@@ -259,9 +295,13 @@
     loadData();
   }
 
-  // Carica i dati dal database
+  // Carica i dati dal database ordinando per Materiale e Spessore
   async function loadData() {
-    const { data, error } = await db.from('inventario').select('*').order('materiale', { ascending: true });
+    const { data, error } = await db.from('inventario')
+      .select('*')
+      .order('materiale', { ascending: true })
+      .order('spessore_mm', { ascending: true });
+      
     if (!error) {
       rawData = data;
       renderTable(data);
@@ -273,7 +313,7 @@
     tbody.innerHTML = '';
 
     if (items.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #64748b;">Nessun materiale in archivio.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #64748b;">Nessun materiale trovato.</td></tr>';
       return;
     }
 
@@ -299,7 +339,7 @@
         : `<div class="qty-box">
              <button class="btn-qty" title="-1 foglio" onclick="changeQtyByDelta(${item.id}, -1)">-1</button>
              <button class="btn-qty" title="+1 foglio" onclick="changeQtyByDelta(${item.id}, 1)">+1</button>
-             <input type="number" id="custom-delta-${item.id}" class="custom-qty-input" placeholder="± custom" onkeydown="if(event.key==='Enter') applyCustomDelta(${item.id})">
+             <input type="number" id="custom-delta-${item.id}" class="custom-qty-input" placeholder="± qtà" onkeydown="if(event.key==='Enter') applyCustomDelta(${item.id})">
              <button class="btn btn-primary" style="padding: 5px 8px; font-size: 11px;" onclick="applyCustomDelta(${item.id})">OK</button>
            </div>`;
 
@@ -322,7 +362,7 @@
     });
   }
 
-  // Variazione Quantità singola (+1 / -1)
+  // Variazione Quantità (+1 / -1)
   async function changeQtyByDelta(id, delta) {
     if (isNaN(delta) || delta === 0) return;
     const item = rawData.find(i => i.id === id);
@@ -349,7 +389,7 @@
     }
   }
 
-  // Applica variazione numerica personalizzata (es. +10 o -5)
+  // Variazione personalizzata (es. +10 o -5)
   function applyCustomDelta(id) {
     const inputEl = document.getElementById(`custom-delta-${id}`);
     if (!inputEl) return;
@@ -368,16 +408,18 @@
     }
   }
 
-  // Filtro materiali e testo
+  // Filtro materiali e testo (Escludendo il formato)
   function filterTable() {
-    const search = document.getElementById('search-input').value.toLowerCase();
+    const search = document.getElementById('search-input').value.toLowerCase().trim();
     const matFilter = document.getElementById('filter-material').value;
 
     const filtered = rawData.filter(item => {
-      const matchSearch = item.materiale.toLowerCase().includes(search) || 
+      // Escludiamo espressamente item.formato dalla ricerca testuale
+      const matchSearch = search === '' || 
+                          item.materiale.toLowerCase().includes(search) || 
                           item.spessore_mm.toString().includes(search) || 
-                          item.formato.toLowerCase().includes(search) || 
                           (item.note && item.note.toLowerCase().includes(search));
+                          
       const matchMat = matFilter === '' || item.materiale === matFilter;
       return matchSearch && matchMat;
     });
