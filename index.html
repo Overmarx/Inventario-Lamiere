@@ -145,9 +145,9 @@
       </div>
 
       <div class="header-right">
-        <button id="btn-add-modal" class="btn btn-primary" onclick="openModal()">+ Nuova Lamiera</button>
-        <button class="btn btn-info" onclick="openHistoryModal()">📜 Storico</button>
-        <button onclick="logout()" class="btn btn-secondary">Esci</button>
+        <button id="btn-add-modal" type="button" class="btn btn-primary" onclick="openModal()">+ Nuova Lamiera</button>
+        <button type="button" class="btn btn-info" onclick="openHistoryModal()">📜 Storico</button>
+        <button type="button" onclick="logout()" class="btn btn-secondary">Esci</button>
       </div>
     </header>
 
@@ -160,7 +160,7 @@
         <option value="Alluminio">Alluminio</option>
         <option value="Zincato">Zincato</option>
       </select>
-      <button id="btn-toggle-weights" class="btn btn-secondary" onclick="toggleWeights()">⚖️ Pesi</button>
+      <button id="btn-toggle-weights" type="button" class="btn btn-secondary" onclick="toggleWeights()">⚖️ Pesi</button>
     </div>
 
     <div class="table-responsive">
@@ -187,7 +187,7 @@
 </div>
 
 <!-- PULSANTE PDF FLUTTUANTE (SOLO ICONA) -->
-<button class="btn-pdf-float" id="btn-pdf" onclick="generatePDF()" title="Esporta PDF" style="display: none;">📄</button>
+<button class="btn-pdf-float" id="btn-pdf" type="button" onclick="generatePDF()" title="Esporta PDF" style="display: none;">📄</button>
 
 <!-- MODAL FORM AGGIUNGI / MODIFICA -->
 <div class="modal" id="item-modal">
@@ -233,7 +233,7 @@
   <div class="modal-content" style="max-width: 850px;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
       <h3>📜 Storico Movimenti (Ultimi 50)</h3>
-      <button class="btn btn-secondary" onclick="closeHistoryModal()">Chiudi</button>
+      <button type="button" class="btn btn-secondary" onclick="closeHistoryModal()">Chiudi</button>
     </div>
     <div class="table-responsive">
       <table>
@@ -419,10 +419,10 @@
       let qtyControls = isReadOnly 
         ? `<span style="color: #64748b;">-</span>` 
         : `<div class="qty-box">
-             <button class="btn-qty" title="-1 foglio" onclick="changeQtyByDelta(${item.id}, -1)">-1</button>
-             <button class="btn-qty" title="+1 foglio" onclick="changeQtyByDelta(${item.id}, 1)">+1</button>
+             <button type="button" class="btn-qty" title="-1 foglio" onclick="changeQtyByDelta(${item.id}, -1)">-1</button>
+             <button type="button" class="btn-qty" title="+1 foglio" onclick="changeQtyByDelta(${item.id}, 1)">+1</button>
              <input type="number" id="custom-delta-${item.id}" class="custom-qty-input" placeholder="± qtà" onkeydown="if(event.key==='Enter') applyCustomDelta(${item.id})">
-             <button class="btn btn-primary" style="padding: 5px 8px; font-size: 11px;" onclick="applyCustomDelta(${item.id})">OK</button>
+             <button type="button" class="btn btn-primary" style="padding: 5px 8px; font-size: 11px;" onclick="applyCustomDelta(${item.id})">OK</button>
            </div>`;
 
       // Calcolo Pesi
@@ -432,8 +432,8 @@
         : '-';
 
       let actionContent = isReadOnly ? '' : `
-        <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="editItem(${item.id})">✏️</button>
-        <button class="btn btn-danger" style="padding: 4px 8px; font-size: 11px;" onclick="deleteItem(${item.id}, '${item.materiale} ${item.spessore_mm}mm')">🗑️</button>
+        <button type="button" class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="editItem(${item.id})">✏️</button>
+        <button type="button" class="btn btn-danger" style="padding: 4px 8px; font-size: 11px;" onclick="deleteItem(${item.id}, '${item.materiale} ${item.spessore_mm}mm')">🗑️</button>
       `;
 
       tr.innerHTML = `
@@ -451,43 +451,74 @@
     });
   }
 
-  // Variazione Quantità (+1 / -1) - CORRETTO PER EVITARE AZZERAMENTO IMPREVISTO
+  // Variazione Quantità (+1 / -1 / custom) - Versione blindata con lettura diretta dal DB
   async function changeQtyByDelta(id, delta) {
     const deltaNum = parseInt(delta, 10);
     if (isNaN(deltaNum) || deltaNum === 0) return;
 
-    // Confronto elastico id (==) in caso di tipi stringa/numero
-    const item = rawData.find(i => i.id == id);
-    if (!item) return;
+    // 1. Recupero la riga reale e aggiornata dal DB Supabase
+    const { data: item, error: fetchErr } = await db
+      .from('inventario')
+      .select('*')
+      .eq('id', id)
+      .single();
 
-    // Assicuriamo che la quantità attuale sia parsata come numero intero
-    const currentQty = parseInt(item.quantita, 10) || 0;
+    if (fetchErr || !item) {
+      console.error("Errore recupero scheda dal DB:", fetchErr);
+      alert("Impossibile recuperare la scheda dal database.");
+      return;
+    }
+
+    // 2. Lettura ed estrazione sicura della quantità
+    const currentQty = (item.quantita !== null && item.quantita !== undefined) 
+      ? parseInt(item.quantita, 10) 
+      : 0;
+
     let newQty = currentQty + deltaNum;
     if (newQty < 0) newQty = 0;
-    
+
     const actualDiff = newQty - currentQty;
     if (actualDiff === 0) return;
 
-    const { error } = await db.from('inventario')
+    // 3. Salvataggio su DB
+    const { error: updateErr } = await db
+      .from('inventario')
       .update({ quantita: newQty, updated_at: new Date().toISOString() })
       .eq('id', id);
 
-    if (!error) {
+    if (updateErr) {
+      console.error("Errore aggiornamento giacenza:", updateErr);
+      alert("Errore durante l'aggiornamento della quantità.");
+      return;
+    }
+
+    // 4. Scrittura registro storico movimenti (con salvataggio sicuro)
+    const payloadStorico = {
+      lamiera_id: id,
+      materiale: item.materiale,
+      spessore_mm: item.spessore_mm,
+      formato: item.formato,
+      tipo_operazione: actualDiff > 0 ? 'CARICO' : 'SCARICO',
+      quantita_variata: actualDiff,
+      quantita_risultante: newQty,
+      operatore: currentUser ? currentUser.email : 'Operatore'
+    };
+
+    const { error: histErr } = await db.from('storico_movimenti').insert(payloadStorico);
+
+    // Fallback: se le nuove colonne non esistono ancora nel DB Supabase, scrive lo storico minimale
+    if (histErr) {
       await db.from('storico_movimenti').insert({
         lamiera_id: id,
-        materiale: item.materiale,
-        spessore_mm: item.spessore_mm,
-        formato: item.formato,
         tipo_operazione: actualDiff > 0 ? 'CARICO' : 'SCARICO',
         quantita_variata: actualDiff,
         quantita_risultante: newQty,
         operatore: currentUser ? currentUser.email : 'Operatore'
       });
-      loadData();
-    } else {
-      console.error("Errore aggiornamento giacenza:", error);
-      alert("Errore durante l'aggiornamento della quantità.");
     }
+
+    // 5. Ricarica dati
+    loadData();
   }
 
   // Variazione personalizzata (es. +10 o -5)
@@ -694,7 +725,7 @@
       const isCarico = m.tipo_operazione === 'CARICO';
       const badgeColor = isCarico ? 'color: #4ade80;' : 'color: #f87171;';
       
-      // Fallback intelligente: prende le info dalla tabella 'inventario' (join) o dai campi salvati
+      // Fallback: legge le info dalla tabella 'inventario' (join) o dai campi salvati
       const mat = m.materiale || m.inventario?.materiale || '-';
       const spess = (m.spessore_mm || m.inventario?.spessore_mm) ? (m.spessore_mm || m.inventario?.spessore_mm) + ' mm' : '-';
       const form = m.formato || m.inventario?.formato || '-';
