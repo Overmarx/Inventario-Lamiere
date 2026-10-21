@@ -152,7 +152,7 @@
     </header>
 
     <div class="controls">
-      <input type="text" id="search-input" placeholder="Cerca materiale (es. 'fe' + Invio), spessore, formato o note..." oninput="filterTable()" style="flex-grow: 1;">
+      <input type="text" id="search-input" placeholder="Cerca materiale (es. 'fe' + Invio), spessore o note..." oninput="filterTable()" style="flex-grow: 1;">
       <select id="filter-material" onchange="filterTable()">
         <option value="">Tutti i Materiali</option>
         <option value="Ferro">Ferro</option>
@@ -214,7 +214,7 @@
       </div>
       <div class="form-group">
         <label>Quantità Fogli</label>
-        <input type="number" id="item-quantita" required min="0" value="0">
+        <input type="number" step="any" id="item-quantita" required min="0" value="0" placeholder="es. 1 o 0.5">
       </div>
       <div class="form-group">
         <label>Note (Opzionale)</label>
@@ -228,7 +228,7 @@
   </div>
 </div>
 
-<!-- MODAL STORICO MOVIMENTI (POTENZIATO) -->
+<!-- MODAL STORICO MOVIMENTI -->
 <div class="modal" id="history-modal">
   <div class="modal-content" style="max-width: 850px;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
@@ -403,7 +403,8 @@
 
     items.forEach(item => {
       const tr = document.createElement('tr');
-      if (item.quantita === 0) tr.classList.add('zero-qty');
+      const qtyNum = parseFloat(item.quantita) || 0;
+      if (qtyNum <= 0) tr.classList.add('zero-qty');
 
       const dateStr = new Date(item.updated_at).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
@@ -414,21 +415,21 @@
       else if (matLower.includes('alluminio')) matClass = 'mat-alluminio';
       else if (matLower.includes('zincato')) matClass = 'mat-zincato';
 
-      let qtyDisplay = item.quantita === 0 
+      let qtyDisplay = qtyNum <= 0 
         ? `<span class="zero-qty-badge">0 (ESAURITO)</span>` 
-        : `<strong style="font-size: 15px; color: #f8fafc;">${item.quantita}</strong>`;
+        : `<strong style="font-size: 15px; color: #f8fafc;">${qtyNum}</strong>`;
 
       let qtyControls = isReadOnly 
         ? `<span style="color: #64748b;">-</span>` 
         : `<div class="qty-box">
              <button type="button" class="btn-qty" title="-1 foglio" onclick="changeQtyByDelta(${item.id}, -1)">-1</button>
              <button type="button" class="btn-qty" title="+1 foglio" onclick="changeQtyByDelta(${item.id}, 1)">+1</button>
-             <input type="number" id="custom-delta-${item.id}" class="custom-qty-input" placeholder="± qtà" onkeydown="if(event.key==='Enter') applyCustomDelta(${item.id})">
+             <input type="number" step="any" id="custom-delta-${item.id}" class="custom-qty-input" placeholder="± qtà" onkeydown="if(event.key==='Enter') applyCustomDelta(${item.id})">
              <button type="button" class="btn btn-primary" style="padding: 5px 8px; font-size: 11px;" onclick="applyCustomDelta(${item.id})">OK</button>
            </div>`;
 
       // Calcolo Pesi
-      const wInfo = calculateWeight(item.materiale, item.spessore_mm, item.formato, item.quantita);
+      const wInfo = calculateWeight(item.materiale, item.spessore_mm, item.formato, qtyNum);
       const weightDisplay = wInfo 
         ? `<span style="color: #f59e0b;">${wInfo.single} kg</span> / <strong style="color: #38bdf8;">${wInfo.total} kg</strong>`
         : '-';
@@ -453,12 +454,12 @@
     });
   }
 
-  // Variazione Quantità (+1 / -1 / custom) - Versione blindata con lettura diretta dal DB
+  // Variazione Quantità (+1 / -1 / custom decimali)
   async function changeQtyByDelta(id, delta) {
-    const deltaNum = parseInt(delta, 10);
+    const deltaNum = parseFloat(delta);
     if (isNaN(deltaNum) || deltaNum === 0) return;
 
-    // 1. Recupero la riga reale e aggiornata dal DB Supabase
+    // 1. Recupero riga dal DB
     const { data: item, error: fetchErr } = await db
       .from('inventario')
       .select('*')
@@ -471,15 +472,15 @@
       return;
     }
 
-    // 2. Lettura ed estrazione sicura della quantità
+    // 2. Lettura ed estrazione quantita con supporto float
     const currentQty = (item.quantita !== null && item.quantita !== undefined) 
-      ? parseInt(item.quantita, 10) 
+      ? parseFloat(item.quantita) 
       : 0;
 
-    let newQty = currentQty + deltaNum;
+    let newQty = Math.round((currentQty + deltaNum) * 1000) / 1000;
     if (newQty < 0) newQty = 0;
 
-    const actualDiff = newQty - currentQty;
+    const actualDiff = Math.round((newQty - currentQty) * 1000) / 1000;
     if (actualDiff === 0) return;
 
     // 3. Salvataggio su DB
@@ -494,7 +495,7 @@
       return;
     }
 
-    // 4. Scrittura registro storico movimenti (con salvataggio sicuro)
+    // 4. Scrittura registro storico movimenti
     const payloadStorico = {
       lamiera_id: id,
       materiale: item.materiale,
@@ -508,7 +509,6 @@
 
     const { error: histErr } = await db.from('storico_movimenti').insert(payloadStorico);
 
-    // Fallback: se le nuove colonne non esistono ancora nel DB Supabase, scrive lo storico minimale
     if (histErr) {
       await db.from('storico_movimenti').insert({
         lamiera_id: id,
@@ -523,11 +523,11 @@
     loadData();
   }
 
-  // Variazione personalizzata (es. +10 o -5)
+  // Variazione personalizzata (es. +0.5 o -1.2)
   function applyCustomDelta(id) {
     const inputEl = document.getElementById(`custom-delta-${id}`);
     if (!inputEl) return;
-    const val = parseInt(inputEl.value, 10);
+    const val = parseFloat(inputEl.value);
     if (!isNaN(val) && val !== 0) {
       changeQtyByDelta(id, val);
       inputEl.value = '';
@@ -542,7 +542,7 @@
     }
   }
 
-  // Filtro materiali, testo e formato
+  // Filtro materiali - SOLO Materiale, Spessore e Note (Esclusi Formato e Quantità)
   function filterTable() {
     const search = document.getElementById('search-input').value.toLowerCase().trim();
     const matFilter = document.getElementById('filter-material').value;
@@ -551,7 +551,6 @@
       const matchSearch = search === '' || 
                           item.materiale.toLowerCase().includes(search) || 
                           item.spessore_mm.toString().includes(search) || 
-                          item.formato.toLowerCase().includes(search) || 
                           (item.note && item.note.toLowerCase().includes(search));
                           
       const matchMat = matFilter === '' || item.materiale === matFilter;
@@ -576,7 +575,6 @@
 
     const nowStr = new Date().toLocaleString('it-IT');
 
-    // Creazione del contenitore grafico pulito per la stampa PDF
     const pdfContainer = document.createElement('div');
     pdfContainer.style.padding = '20px';
     pdfContainer.style.fontFamily = 'Helvetica, Arial, sans-serif';
@@ -588,18 +586,19 @@
     let totFogliAll = 0;
 
     currentFilteredData.forEach(item => {
-      const w = calculateWeight(item.materiale, item.spessore_mm, item.formato, item.quantita);
+      const qtyNum = parseFloat(item.quantita) || 0;
+      const w = calculateWeight(item.materiale, item.spessore_mm, item.formato, qtyNum);
       const singleKg = w ? w.single + ' kg' : '-';
       const totalKg = w ? w.total + ' kg' : '-';
       if (w) totKgAll += parseFloat(w.total);
-      totFogliAll += item.quantita;
+      totFogliAll += qtyNum;
 
       tableRows += `
         <tr style="border-bottom: 1px solid #e2e8f0;">
           <td style="padding: 8px; font-weight: bold;">${item.materiale}</td>
           <td style="padding: 8px;">${item.spessore_mm} mm</td>
           <td style="padding: 8px;">${item.formato}</td>
-          <td style="padding: 8px; font-weight: bold;">${item.quantita}</td>
+          <td style="padding: 8px; font-weight: bold;">${qtyNum}</td>
           <td style="padding: 8px;">${singleKg}</td>
           <td style="padding: 8px; font-weight: bold; color: #0284c7;">${totalKg}</td>
           <td style="padding: 8px; color: #64748b;">${item.note || '-'}</td>
@@ -638,7 +637,7 @@
 
       <div style="display: flex; justify-content: space-between; background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 15px; border-radius: 6px; font-size: 11px;">
         <div><strong>Tipi di Lamiera:</strong> ${currentFilteredData.length}</div>
-        <div><strong>Totale Fogli in Giacenza:</strong> ${totFogliAll}</div>
+        <div><strong>Totale Fogli in Giacenza:</strong> ${totFogliAll.toFixed(2).replace(/\.00$/, '')}</div>
         <div><strong>Peso Complessivo Stimato:</strong> <span style="color: #0284c7; font-weight: bold;">${totKgAll.toFixed(1)} kg</span></div>
       </div>
     `;
@@ -681,7 +680,7 @@
     document.getElementById('item-modal').style.display = 'flex';
   }
 
-  // Salva Form
+  // Salva Form (supporta decimali per quantità)
   document.getElementById('item-form').onsubmit = async (e) => {
     e.preventDefault();
     const id = document.getElementById('item-id').value;
@@ -689,7 +688,7 @@
       materiale: document.getElementById('item-materiale').value,
       spessore_mm: parseFloat(document.getElementById('item-spessore').value),
       formato: document.getElementById('item-formato').value,
-      quantita: parseInt(document.getElementById('item-quantita').value, 10) || 0,
+      quantita: parseFloat(document.getElementById('item-quantita').value) || 0,
       note: document.getElementById('item-note').value,
       updated_at: new Date().toISOString()
     };
@@ -704,7 +703,7 @@
     loadData();
   };
 
-  // Storico Movimenti Modal (POTENZIATO CON DATI LAMIERA)
+  // Storico Movimenti Modal
   async function openHistoryModal() {
     document.getElementById('history-modal').style.display = 'flex';
     const tbody = document.getElementById('history-list');
@@ -727,7 +726,6 @@
       const isCarico = m.tipo_operazione === 'CARICO';
       const badgeColor = isCarico ? 'color: #4ade80;' : 'color: #f87171;';
       
-      // Fallback: legge le info dalla tabella 'inventario' (join) o dai campi salvati
       const mat = m.materiale || m.inventario?.materiale || '-';
       const spess = (m.spessore_mm || m.inventario?.spessore_mm) ? (m.spessore_mm || m.inventario?.spessore_mm) + ' mm' : '-';
       const form = m.formato || m.inventario?.formato || '-';
