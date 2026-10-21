@@ -152,7 +152,7 @@
     </header>
 
     <div class="controls">
-      <input type="text" id="search-input" placeholder="Cerca materiale (es. 'fe' + Invio), spessore o note..." oninput="filterTable()" style="flex-grow: 1;">
+      <input type="text" id="search-input" placeholder="Cerca materiale (es. 'fe' + Invio), spessore, formato o note..." oninput="filterTable()" style="flex-grow: 1;">
       <select id="filter-material" onchange="filterTable()">
         <option value="">Tutti i Materiali</option>
         <option value="Ferro">Ferro</option>
@@ -228,9 +228,9 @@
   </div>
 </div>
 
-<!-- MODAL STORICO MOVIMENTI -->
+<!-- MODAL STORICO MOVIMENTI (POTENZIATO) -->
 <div class="modal" id="history-modal">
-  <div class="modal-content">
+  <div class="modal-content" style="max-width: 850px;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
       <h3>📜 Storico Movimenti (Ultimi 50)</h3>
       <button class="btn btn-secondary" onclick="closeHistoryModal()">Chiudi</button>
@@ -240,6 +240,9 @@
         <thead>
           <tr>
             <th>Data/Ora</th>
+            <th>Materiale</th>
+            <th>Spessore</th>
+            <th>Formato</th>
             <th>Tipo</th>
             <th>Variazione</th>
             <th>Saldo</th>
@@ -247,7 +250,7 @@
           </tr>
         </thead>
         <tbody id="history-list">
-          <tr><td colspan="5" style="text-align: center; color: #64748b;">Caricamento storico...</td></tr>
+          <tr><td colspan="8" style="text-align: center; color: #64748b;">Caricamento storico...</td></tr>
         </tbody>
       </table>
     </div>
@@ -448,30 +451,42 @@
     });
   }
 
-  // Variazione Quantità (+1 / -1)
+  // Variazione Quantità (+1 / -1) - CORRETTO PER EVITARE AZZERAMENTO IMPREVISTO
   async function changeQtyByDelta(id, delta) {
-    if (isNaN(delta) || delta === 0) return;
-    const item = rawData.find(i => i.id === id);
+    const deltaNum = parseInt(delta, 10);
+    if (isNaN(deltaNum) || deltaNum === 0) return;
+
+    // Confronto elastico id (==) in caso di tipi stringa/numero
+    const item = rawData.find(i => i.id == id);
     if (!item) return;
 
-    let newQty = item.quantita + delta;
+    // Assicuriamo che la quantità attuale sia parsata come numero intero
+    const currentQty = parseInt(item.quantita, 10) || 0;
+    let newQty = currentQty + deltaNum;
     if (newQty < 0) newQty = 0;
-    const actualDiff = newQty - item.quantita;
+    
+    const actualDiff = newQty - currentQty;
     if (actualDiff === 0) return;
 
     const { error } = await db.from('inventario')
-      .update({ quantita: newQty, updated_at: new Date() })
+      .update({ quantita: newQty, updated_at: new Date().toISOString() })
       .eq('id', id);
 
     if (!error) {
       await db.from('storico_movimenti').insert({
         lamiera_id: id,
+        materiale: item.materiale,
+        spessore_mm: item.spessore_mm,
+        formato: item.formato,
         tipo_operazione: actualDiff > 0 ? 'CARICO' : 'SCARICO',
         quantita_variata: actualDiff,
         quantita_risultante: newQty,
-        operatore: currentUser.email
+        operatore: currentUser ? currentUser.email : 'Operatore'
       });
       loadData();
+    } else {
+      console.error("Errore aggiornamento giacenza:", error);
+      alert("Errore durante l'aggiornamento della quantità.");
     }
   }
 
@@ -479,7 +494,7 @@
   function applyCustomDelta(id) {
     const inputEl = document.getElementById(`custom-delta-${id}`);
     if (!inputEl) return;
-    const val = parseInt(inputEl.value);
+    const val = parseInt(inputEl.value, 10);
     if (!isNaN(val) && val !== 0) {
       changeQtyByDelta(id, val);
       inputEl.value = '';
@@ -494,7 +509,7 @@
     }
   }
 
-  // Filtro materiali e testo (Escludendo il formato)
+  // Filtro materiali, testo e formato
   function filterTable() {
     const search = document.getElementById('search-input').value.toLowerCase().trim();
     const matFilter = document.getElementById('filter-material').value;
@@ -503,6 +518,7 @@
       const matchSearch = search === '' || 
                           item.materiale.toLowerCase().includes(search) || 
                           item.spessore_mm.toString().includes(search) || 
+                          item.formato.toLowerCase().includes(search) || 
                           (item.note && item.note.toLowerCase().includes(search));
                           
       const matchMat = matFilter === '' || item.materiale === matFilter;
@@ -618,7 +634,7 @@
   }
 
   function editItem(id) {
-    const item = rawData.find(i => i.id === id);
+    const item = rawData.find(i => i.id == id);
     if (!item) return;
 
     document.getElementById('item-id').value = item.id;
@@ -640,9 +656,9 @@
       materiale: document.getElementById('item-materiale').value,
       spessore_mm: parseFloat(document.getElementById('item-spessore').value),
       formato: document.getElementById('item-formato').value,
-      quantita: parseInt(document.getElementById('item-quantita').value),
+      quantita: parseInt(document.getElementById('item-quantita').value, 10) || 0,
       note: document.getElementById('item-note').value,
-      updated_at: new Date()
+      updated_at: new Date().toISOString()
     };
 
     if (id) {
@@ -655,19 +671,19 @@
     loadData();
   };
 
-  // Storico Movimenti Modal
+  // Storico Movimenti Modal (POTENZIATO CON DATI LAMIERA)
   async function openHistoryModal() {
     document.getElementById('history-modal').style.display = 'flex';
     const tbody = document.getElementById('history-list');
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #64748b;">Lettura storico...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #64748b;">Lettura storico...</td></tr>';
 
     const { data, error } = await db.from('storico_movimenti')
-      .select('*')
+      .select('*, inventario(materiale, spessore_mm, formato)')
       .order('created_at', { ascending: false })
       .limit(50);
 
     if (error || !data || data.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #64748b;">Nessun movimento trovato.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #64748b;">Nessun movimento trovato.</td></tr>';
       return;
     }
 
@@ -678,8 +694,16 @@
       const isCarico = m.tipo_operazione === 'CARICO';
       const badgeColor = isCarico ? 'color: #4ade80;' : 'color: #f87171;';
       
+      // Fallback intelligente: prende le info dalla tabella 'inventario' (join) o dai campi salvati
+      const mat = m.materiale || m.inventario?.materiale || '-';
+      const spess = (m.spessore_mm || m.inventario?.spessore_mm) ? (m.spessore_mm || m.inventario?.spessore_mm) + ' mm' : '-';
+      const form = m.formato || m.inventario?.formato || '-';
+
       tr.innerHTML = `
         <td style="font-size: 11px; color: #94a3b8;">${dateStr}</td>
+        <td><strong style="color: #f8fafc;">${mat}</strong></td>
+        <td><span style="color: #38bdf8;">${spess}</span></td>
+        <td style="font-size: 12px;">${form}</td>
         <td style="${badgeColor} font-weight: bold;">${m.tipo_operazione}</td>
         <td><strong style="${badgeColor}">${m.quantita_variata > 0 ? '+' + m.quantita_variata : m.quantita_variata}</strong></td>
         <td><strong>${m.quantita_risultante}</strong></td>
