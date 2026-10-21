@@ -68,4 +68,4 @@ Applicazione web single-page (`index.html`) per la gestione in tempo reale della
 ## ⚙️ Setup & Deployment
 
 1. **GitHub Pages**
-2. **Supabase**: 
+2. **Supabase**
