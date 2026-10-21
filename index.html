@@ -376,12 +376,14 @@
     });
   }
 
-  // Carica i dati dal database
+  // Carica i dati dal database (con ordinamento deterministico fisso)
   async function loadData() {
     const { data, error } = await db.from('inventario')
       .select('*')
       .order('materiale', { ascending: true })
-      .order('spessore_mm', { ascending: true });
+      .order('spessore_mm', { ascending: true })
+      .order('formato', { ascending: true })
+      .order('id', { ascending: true });
       
     if (!error) {
       rawData = data;
